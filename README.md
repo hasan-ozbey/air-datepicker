@@ -18,6 +18,33 @@ import 'air-datepicker/air-datepicker.css'
 new AirDatepicker('#el' [, options]);
 ```
 
+### Repeated date occurrences
+
+`dateOccurrences` can render the same calendar date more than once. Additional occurrences are placed in sparse
+rows directly below the date's natural week, in the same weekday column. Each occurrence needs a stable `id` so it
+can be selected and focused independently.
+
+```javascript
+new AirDatepicker('#el', {
+    selectedDates: ['2026-10-20'],
+    selectedOccurrenceId: 'second',
+    dateOccurrences(date) {
+        if (date.getFullYear() !== 2026 || date.getMonth() !== 9 || date.getDate() !== 20) return;
+
+        return [
+            {id: 'first', html: '20¹'},
+            {id: 'second', html: '20²'}
+        ];
+    },
+    onSelect({date, occurrenceId}) {
+        // occurrenceId is "first" or "second" for the repeated date.
+    }
+});
+```
+
+The `occurrenceId` is also passed to `onBeforeSelect`, `onFocus`, and `onRenderCell`. Programmatic selection accepts
+the same value: `datepicker.selectDate('2026-10-20', {occurrenceId: 'second'})`.
+
 ## Demo and docs
 * [Version 3](https://air-datepicker.com)
 

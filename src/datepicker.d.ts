@@ -27,6 +27,12 @@ export declare type AirDatepickerPosition = 'left' | 'left top' | 'left bottom' 
 export declare type AirDatepickerViews = 'days' | 'months' | 'years';
 export declare type AirDatepickerViewsSingle = 'day' | 'month' | 'year';
 export declare type AirDatepickerDate = string | number | Date;
+export declare type AirDatepickerOccurrence = {
+    id: string | number,
+    html?: string,
+    classes?: string,
+    attrs?: Record<string, string | number | undefined>
+};
 export declare type AirDatepickerNavEntry = string | ((dp: AirDatepicker) => string);
 export declare type AirDatepickerDecade = [number, number];
 export declare type AirDatepickerPositionCallback = (
@@ -99,11 +105,13 @@ export declare type AirDatepickerOptions<E extends HTMLElement = HTMLInputElemen
     hoursStep?: number,
     minutesStep?: number,
     fixedHeight?: boolean,
+    dateOccurrences?: ((date: Date) => AirDatepickerOccurrence[] | void) | false,
+    selectedOccurrenceId?: string | number | false,
 
-    onSelect?: ({date, formattedDate, datepicker}: {date: Date | Date[], formattedDate: string | string[], datepicker: AirDatepicker<E>}) => void,
+    onSelect?: ({date, formattedDate, occurrenceId, datepicker}: {date: Date | Date[], formattedDate: string | string[], occurrenceId: string | number | (string | number | false)[] | false, datepicker: AirDatepicker<E>}) => void,
     onChangeViewDate?: ({month, year, decade}: {month: number, year: number, decade: AirDatepickerDecade}) => void,
     onChangeView?: (view: AirDatepickerViews) => void,
-    onRenderCell?: (params: {date: Date, cellType: AirDatepickerViewsSingle, datepicker: AirDatepicker<E>}) => ({
+    onRenderCell?: (params: {date: Date, cellType: AirDatepickerViewsSingle, occurrenceId: string | number | false, occurrenceIndex: number, datepicker: AirDatepicker<E>}) => ({
         disabled?: boolean,
         classes?: string,
         html?: string
@@ -112,8 +120,8 @@ export declare type AirDatepickerOptions<E extends HTMLElement = HTMLInputElemen
     onShow?: (isAnimationComplete: boolean) => void,
     onHide?: (isAnimationComplete: boolean) => void,
     onClickDayName?: ({dayIndex, datepicker}: {dayIndex: number, datepicker: AirDatepicker<E>}) => void
-    onBeforeSelect?: ({date, datepicker}: {date: Date, datepicker: AirDatepicker}) => boolean;
-    onFocus?: ({date, datepicker}: {date: Date, datepicker: AirDatepicker}) => void;
+    onBeforeSelect?: ({date, occurrenceId, datepicker}: {date: Date, occurrenceId: string | number | false, datepicker: AirDatepicker}) => boolean;
+    onFocus?: ({date, occurrenceId, datepicker}: {date: Date, occurrenceId: string | number | false, datepicker: AirDatepicker}) => void;
 }
 
 
@@ -137,15 +145,15 @@ declare class AirDatepicker<E extends HTMLElement = HTMLInputElement> {
      * @return {Promise<void>} - returns promise, since input value updates asynchronously, after promise resolves, we need a promise to be able to get current input value
      * @example selectDate(new Date()).then(() => {console.log(dp.$el.value)})
      */
-    selectDate: (date: AirDatepickerDate | AirDatepickerDate[], opts?: {updateTime?: boolean, silent?: boolean}) => Promise<void>
-    unselectDate: (date: AirDatepickerDate) => void
+    selectDate: (date: AirDatepickerDate | AirDatepickerDate[], opts?: {updateTime?: boolean, silent?: boolean, occurrenceId?: string | number | false}) => Promise<void>
+    unselectDate: (date: AirDatepickerDate, occurrenceId?: string | number | false) => void
     clear: (opts?: {silent?: boolean}) => void
     formatDate: (date: AirDatepickerDate, format: string) => string
     destroy: () => void
     update: (newOpts?: AirDatepickerOptions, params?: {silent?: boolean}) => void
     setCurrentView: (newView: AirDatepickerViews, params?: {silent?: boolean}) => void
     setViewDate: (newViewDate: AirDatepickerDate) => void
-    setFocusDate: (date: AirDatepickerDate | false, opts?: {viewDateTransition?: boolean}) => void
+    setFocusDate: (date: AirDatepickerDate | false, opts?: {viewDateTransition?: boolean, occurrenceId?: string | number | false}) => void
     up: (date?: AirDatepickerDate) => void
     down: (date?: AirDatepickerDate) => void
     disableDate: (date: AirDatepickerDate | AirDatepickerDate[]) => void
@@ -157,6 +165,8 @@ declare class AirDatepicker<E extends HTMLElement = HTMLInputElement> {
     currentView: AirDatepickerViews
     selectedDates: Date[]
     focusDate: Date | false
+    focusOccurrenceId: string | number | false
+    selectedOccurrenceId: string | number | false
     visible: boolean
     disabledDates: Set<string>
     isDestroyed: boolean;
