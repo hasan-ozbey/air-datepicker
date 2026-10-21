@@ -69,10 +69,13 @@ export default class Datepicker {
 
         this.viewDate = createDate(this.opts.startDate);
         this.focusDate = false;
+        this.focusOccurrenceId = false;
+        this.selectedOccurrenceId = false;
         this.initialReadonly = this.$el.getAttribute('readonly');
         this.customHide = false;
         this.currentView = view;
         this.selectedDates = [];
+        this.selectedOccurrenceIds = new WeakMap();
         this.disabledDates = new Set();
         this.isDestroyed = false;
         this.views = {};
@@ -132,7 +135,10 @@ export default class Datepicker {
         }
 
         if (selectedDates) {
-            this.selectDate(selectedDates, {silent: true});
+            this.selectDate(selectedDates, {
+                silent: true,
+                occurrenceId: this.opts.selectedOccurrenceId
+            });
         }
 
         if (this.opts.visible && !treatAsInline) {
@@ -467,7 +473,7 @@ export default class Datepicker {
      */
     selectDate(date, params = {}) {
         let {currentView, parsedViewDate, selectedDates} = this;
-        let {updateTime, silent} = params;
+        let {updateTime, silent, occurrenceId = false} = params;
         let {
             moveToOtherMonthsOnSelect,
             moveToOtherYearsOnSelect,
@@ -493,7 +499,12 @@ export default class Datepicker {
 
         if (!(date instanceof Date)) return;
 
-        if (onBeforeSelect && !silent && !onBeforeSelect({date, datepicker: this})) {
+        if (occurrenceId !== false) {
+            date = copyDate(date);
+            this.selectedOccurrenceIds.set(date, occurrenceId);
+        }
+
+        if (onBeforeSelect && !silent && !onBeforeSelect({date, occurrenceId, datepicker: this})) {
             return Promise.resolve();
         }
 
@@ -517,7 +528,7 @@ export default class Datepicker {
 
         if (multipleDates && !range) {
             if (selectedDaysLen === multipleDates) return;
-            if (!this._checkIfDateIsSelected(date)) {
+            if (!this._checkIfDateIsSelected(date, consts.days, occurrenceId)) {
                 selectedDates.push(date);
             }
         } else if (range) {
@@ -546,6 +557,7 @@ export default class Datepicker {
             }
         } else {
             this.selectedDates = [date];
+            this.selectedOccurrenceId = occurrenceId;
         }
 
         this.trigger(consts.eventChangeSelectedDate, {
@@ -569,7 +581,7 @@ export default class Datepicker {
         });
     }
 
-    unselectDate(date) {
+    unselectDate(date, occurrenceId = false) {
         let selected = this.selectedDates,
             _this = this;
 
@@ -578,18 +590,23 @@ export default class Datepicker {
         if (!(date instanceof Date)) return;
 
         return selected.some((curDate, i) => {
-            if (isSameDate(curDate, date)) {
+            let occurrenceMatches = occurrenceId === false
+                || this.selectedOccurrenceIds.get(curDate) === occurrenceId;
+
+            if (isSameDate(curDate, date) && occurrenceMatches) {
                 selected.splice(i, 1);
 
                 if (!_this.selectedDates.length) {
                     _this.rangeDateFrom = '';
                     _this.rangeDateTo = '';
                     _this._updateLastSelectedDate(false);
+                    _this.selectedOccurrenceId = false;
                 } else {
                     // Assume that if unselectDate has been called, then there is only one selected date
                     // in range mode, so we need to reset rangeDateTo
                     _this.rangeDateTo = '';
                     _this.rangeDateFrom = selected[0];
+                    _this.selectedOccurrenceId = _this.selectedOccurrenceIds.get(selected[0]) ?? false;
 
                     _this._updateLastSelectedDate(_this.selectedDates[_this.selectedDates.length - 1]);
                 }
@@ -634,6 +651,8 @@ export default class Datepicker {
         this.rangeDateFrom = false;
         this.rangeDateTo = false;
         this.lastSelectedDate = false;
+        this.selectedOccurrenceId = false;
+        this.selectedOccurrenceIds = new WeakMap();
 
         this.trigger(consts.eventChangeSelectedDate, {action: consts.actionUnselectDate, silent: params.silent});
 
@@ -858,6 +877,9 @@ export default class Datepicker {
         onSelect({
             date: isMultiple ? dates : dates[0],
             formattedDate: isMultiple ? formattedDates : formattedDates[0],
+            occurrenceId: isMultiple
+                ? selectedDates.map(date => this.selectedOccurrenceIds.get(date) ?? false)
+                : this.selectedOccurrenceId,
             datepicker
         });
     }
@@ -870,11 +892,15 @@ export default class Datepicker {
      * @return {boolean|Date}
      * @private
      */
-    _checkIfDateIsSelected = (date, cellType = consts.days) => {
+    _checkIfDateIsSelected = (date, cellType = consts.days, occurrenceId = false) => {
         let alreadySelectedDate = false;
 
         this.selectedDates.some((selectedDate) => {
             let same = isSameDate(date, selectedDate, cellType);
+
+            if (same && cellType === consts.days && occurrenceId !== false) {
+                same = this.selectedOccurrenceIds.get(selectedDate) === occurrenceId;
+            }
             alreadySelectedDate = same && selectedDate;
             return same;
         });
@@ -882,7 +908,7 @@ export default class Datepicker {
         return alreadySelectedDate;
     }
 
-    _handleAlreadySelectedDates(alreadySelectedDate, cellDate) {
+    _handleAlreadySelectedDates(alreadySelectedDate, cellDate, occurrenceId = false) {
         let {selectedDates, rangeDateFrom, rangeDateTo} = this;
         let {range, toggleSelected} = this.opts;
         let selectedDatesLen = selectedDates.length;
@@ -907,10 +933,11 @@ export default class Datepicker {
         }
 
         if (shouldToggle) {
-            this.unselectDate(cellDateCopy);
+            this.unselectDate(cellDateCopy, occurrenceId);
         } else {
             // Change last selected date to be able to change time when clicking on this cell
             this._updateLastSelectedDate(datesAreSame ? cellDateCopy : alreadySelectedDate);
+            this.selectedOccurrenceId = occurrenceId;
         }
     }
 
@@ -986,6 +1013,7 @@ export default class Datepicker {
         }
 
         this.focusDate = date;
+        this.focusOccurrenceId = date ? params.occurrenceId ?? false : false;
 
         this.trigger(consts.eventChangeFocusDate, date, params);
     }
@@ -1041,7 +1069,7 @@ export default class Datepicker {
      * @param {CellType} cellType
      * @return {HTMLElement | null}
      */
-    getCell(cellDate, cellType = consts.day) {
+    getCell(cellDate, cellType = consts.day, occurrenceId = false) {
         cellDate = createDate(cellDate);
 
         if (!(cellDate instanceof Date)) return;
@@ -1063,7 +1091,13 @@ export default class Datepicker {
             return undefined;
         }
 
-        return this.views[this.currentView].$el.querySelector(resultQuery[cellType]);
+        if (cellType !== consts.day || occurrenceId === false) {
+            return this.views[this.currentView].$el.querySelector(resultQuery[cellType]);
+        }
+
+        let cells = this.views[this.currentView].$el.querySelectorAll(resultQuery[cellType]);
+
+        return [...cells].find(cell => cell.adpCell.occurrenceId === occurrenceId);
     }
 
     destroy = () => {
@@ -1115,7 +1149,7 @@ export default class Datepicker {
 
         deepMerge(this.opts, newOpts);
 
-        let {timepicker, buttons, range, selectedDates, isMobile} = this.opts;
+        let {timepicker, buttons, range, selectedDates, selectedOccurrenceId, isMobile} = this.opts;
         let shouldUpdateDOM = this.visible || this.treatAsInline;
 
         this._createMinMaxDates();
@@ -1124,7 +1158,7 @@ export default class Datepicker {
 
         if (selectedDates) {
             this.selectedDates = [];
-            this.selectDate(selectedDates, {silent});
+            this.selectDate(selectedDates, {silent, occurrenceId: selectedOccurrenceId});
         }
 
         if (newOpts.view) {
@@ -1290,7 +1324,11 @@ export default class Datepicker {
         }
 
         if (this.opts.onFocus) {
-            this.opts.onFocus({datepicker: this, date});
+            this.opts.onFocus({
+                datepicker: this,
+                date,
+                occurrenceId: this.focusOccurrenceId
+            });
         }
 
     }

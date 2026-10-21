@@ -12,13 +12,16 @@ import {
 import './datepickerCell.scss';
 
 export default class DatepickerCell {
-    constructor({type, date, dp, opts, body} = {}) {
+    constructor({type, date, dp, opts, body, occurrence = false, occurrenceIndex = 0} = {}) {
         this.type = type;
         this.singleType = this.type.slice(0, -1); // days -> day etc.'`
         this.date = date;
         this.dp = dp;
         this.opts = opts;
         this.body = body;
+        this.occurrence = occurrence;
+        this.occurrenceId = occurrence?.id ?? false;
+        this.occurrenceIndex = occurrenceIndex;
         this.customData = false;
 
         this.init();
@@ -31,8 +34,14 @@ export default class DatepickerCell {
             this.customData = onRenderCell({
                 date: this.date,
                 cellType: this.singleType,
+                occurrenceId: this.occurrenceId,
+                occurrenceIndex: this.occurrenceIndex,
                 datepicker: this.dp,
             });
+        }
+
+        if (this.occurrence) {
+            this.customData = {...this.customData, ...this.occurrence};
         }
 
         this._createElement();
@@ -65,6 +74,7 @@ export default class DatepickerCell {
                 'data-month': month,
                 'data-date': date,
                 'data-iso-date': `${year}-${fullMonth}-${fullDate}`,
+                ...(this.occurrenceId !== false ? {'data-occurrence-id': this.occurrenceId} : {}),
                 ...extraAttrs,
             }
         });
@@ -216,7 +226,7 @@ export default class DatepickerCell {
     }
 
     _handleSelectedStatus() {
-        let selected = this.dp._checkIfDateIsSelected(this.date, this.type);
+        let selected = this.dp._checkIfDateIsSelected(this.date, this.type, this.occurrenceId);
         if (selected) {
             this.select();
         } else if (!selected && this.selected) {
@@ -225,7 +235,8 @@ export default class DatepickerCell {
     }
 
     _handleInitialFocusStatus() {
-        let datesAreSame = isSameDate(this.dp.focusDate, this.date, this.type);
+        let datesAreSame = isSameDate(this.dp.focusDate, this.date, this.type)
+            && (this.type !== consts.days || this.dp.focusOccurrenceId === this.occurrenceId);
 
         if (datesAreSame) {
             this.focus();
@@ -273,7 +284,8 @@ export default class DatepickerCell {
             return;
         }
 
-        let datesAreSame = isSameDate(date, this.date, this.type);
+        let datesAreSame = isSameDate(date, this.date, this.type)
+            && (this.type !== consts.days || this.dp.focusOccurrenceId === this.occurrenceId);
 
         if (datesAreSame) {
             this.focus();

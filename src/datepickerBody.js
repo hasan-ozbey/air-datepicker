@@ -109,22 +109,36 @@ export default class DatepickerBody {
         this.$names.innerHTML =  this._getDayNamesHtml();
     }
 
-    _generateCell(date) {
+    _generateCell(date, occurrence = false, occurrenceIndex = 0) {
         let {type, dp, opts} = this;
         return new DatepickerCell({
             type,
             dp,
             opts,
             date,
-            body: this
+            body: this,
+            occurrence,
+            occurrenceIndex
         });
+    }
+
+    _getDateOccurrences(date) {
+        if (this.type !== consts.days || !this.opts.dateOccurrences) return [false];
+
+        let occurrences = this.opts.dateOccurrences(date);
+
+        if (!Array.isArray(occurrences) || !occurrences.length) return [false];
+
+        return occurrences;
     }
 
     _generateCells() {
         const getDates = DatepickerBody.getDatesFunction(this.type);
 
         getDates(this.dp, (date) => {
-            this.cells.push(this._generateCell(date));
+            this._getDateOccurrences(date).forEach((occurrence, occurrenceIndex) => {
+                this.cells.push(this._generateCell(date, occurrence, occurrenceIndex));
+            });
         });
     }
 
@@ -160,12 +174,12 @@ export default class DatepickerBody {
             return;
         }
 
-        let alreadySelectedDate = this.dp._checkIfDateIsSelected(cell.date, cell.type);
+        let alreadySelectedDate = this.dp._checkIfDateIsSelected(cell.date, cell.type, cell.occurrenceId);
 
         if (alreadySelectedDate) {
-            this.dp._handleAlreadySelectedDates(alreadySelectedDate, cell.date);
+            this.dp._handleAlreadySelectedDates(alreadySelectedDate, cell.date, cell.occurrenceId);
         } else {
-            this.dp.selectDate(cell.date);
+            this.dp.selectDate(cell.date, {occurrenceId: cell.occurrenceId});
         }
     }
 
@@ -189,7 +203,10 @@ export default class DatepickerBody {
 
     onMouseOverCell = (e) => {
         let $cell = closest(e.target, cellClassName);
-        this.dp.setFocusDate($cell ? $cell.adpCell.date : false);
+        this.dp.setFocusDate(
+            $cell ? $cell.adpCell.date : false,
+            {occurrenceId: $cell ? $cell.adpCell.occurrenceId : false}
+        );
     }
 
     onMouseOutCell = () => {
@@ -293,12 +310,49 @@ export default class DatepickerBody {
     }
 
     render = () => {
+        this.$cells.classList.toggle(
+            '-with-occurrences-',
+            this.type === consts.days && !!this.opts.dateOccurrences
+        );
         this.destroyCells();
 
         this._generateCells();
-        this.cells.forEach((c) => {
-            this.$cells.appendChild(c.render());
-        });
+        if (this.type !== consts.days || !this.opts.dateOccurrences) {
+            this.cells.forEach(c => this.$cells.appendChild(c.render()));
+            return;
+        }
+
+        this._renderDayRows();
+    }
+
+    _renderDayRows() {
+        let dates = DatepickerBody.getDaysDates(this.dp);
+
+        for (let weekStart = 0; weekStart < dates.length; weekStart += 7) {
+            let weekDates = dates.slice(weekStart, weekStart + 7),
+                weekCells = weekDates.map(date => this.cells.filter(cell => isSameDate(cell.date, date))),
+                occurrenceRows = Math.max(...weekCells.map(cells => cells.length));
+
+            for (let occurrenceIndex = 0; occurrenceIndex < occurrenceRows; occurrenceIndex++) {
+                let $row = createElement({className: 'air-datepicker-body--cells-row'});
+
+                if (occurrenceIndex > 0) {
+                    $row.classList.add('-occurrence-row-');
+                }
+
+                weekCells.forEach((cells, columnIndex) => {
+                    let cell = cells[occurrenceIndex];
+
+                    if (!cell) return;
+
+                    let $cell = cell.render();
+                    $cell.style.gridColumn = columnIndex + 1;
+                    $row.appendChild($cell);
+                });
+
+                this.$cells.appendChild($row);
+            }
+        }
     }
 
 

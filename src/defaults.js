@@ -46,6 +46,8 @@ export default {
     showEvent: 'focus',
     autoClose: false,
     fixedHeight: false,
+    dateOccurrences: false,
+    selectedOccurrenceId: false,
 
     // navigation
     prevHtml: '<svg><path d="M 17,12 l -5,5 l 5,5"></path></svg>',

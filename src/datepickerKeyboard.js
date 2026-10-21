@@ -1,5 +1,5 @@
 import consts from './consts';
-import {getParsedDate, getDaysCount} from './utils';
+import {getParsedDate, getDaysCount, isSameDate} from './utils';
 
 export default class DatepickerKeyboard {
     pressedKeys = new Set();
@@ -73,6 +73,15 @@ export default class DatepickerKeyboard {
             m = parsedFocusDate.month,
             d = parsedFocusDate.date;
 
+        let occurrence = this.getAdjacentOccurrence(initialFocusDate, keyName);
+
+        if (occurrence) {
+            this.dp.setFocusDate(initialFocusDate, {
+                occurrenceId: occurrence.occurrenceId
+            });
+            return;
+        }
+
         switch (keyName) {
             case 'ArrowLeft':
                 currentView === days ? (d -= 1) : '';
@@ -97,7 +106,26 @@ export default class DatepickerKeyboard {
         }
 
         let newFocusedDate = this.dp.getClampedDate(new Date(y, m, d));
-        this.dp.setFocusDate(newFocusedDate, {viewDateTransition: true});
+        let targetCell = this.dp.getCell(newFocusedDate);
+
+        this.dp.setFocusDate(newFocusedDate, {
+            viewDateTransition: true,
+            occurrenceId: targetCell?.adpCell.occurrenceId ?? false
+        });
+    }
+
+    getAdjacentOccurrence(date, keyName) {
+        if (this.dp.currentView !== consts.days || !['ArrowUp', 'ArrowDown'].includes(keyName)) return false;
+
+        let lastSelectedDate = this.dp.selectedDates[this.dp.selectedDates.length - 1],
+            currentOccurrenceId = this.dp.focusDate
+                ? this.dp.focusOccurrenceId
+                : this.dp.selectedOccurrenceIds.get(lastSelectedDate) ?? this.dp.selectedOccurrenceId,
+            cells = this.dp.views[consts.days].cells.filter(cell => isSameDate(cell.date, date)),
+            currentIndex = cells.findIndex(cell => cell.occurrenceId === currentOccurrenceId),
+            nextIndex = currentIndex + (keyName === 'ArrowDown' ? 1 : -1);
+
+        return cells[nextIndex] || false;
     }
 
     registerKey(keyName) {
@@ -184,11 +212,15 @@ export default class DatepickerKeyboard {
                 return;
             }
             if (focusDate) {
-                let alreadySelectedDate = dp._checkIfDateIsSelected(focusDate);
+                let alreadySelectedDate = dp._checkIfDateIsSelected(
+                    focusDate,
+                    consts.days,
+                    dp.focusOccurrenceId
+                );
                 if (!alreadySelectedDate) {
-                    dp.selectDate(focusDate);
+                    dp.selectDate(focusDate, {occurrenceId: dp.focusOccurrenceId});
                 } else {
-                    dp._handleAlreadySelectedDates(alreadySelectedDate, focusDate);
+                    dp._handleAlreadySelectedDates(alreadySelectedDate, focusDate, dp.focusOccurrenceId);
                 }
                 return;
             }
