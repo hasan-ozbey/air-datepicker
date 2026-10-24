@@ -18,6 +18,53 @@ import 'air-datepicker/air-datepicker.css'
 new AirDatepicker('#el' [, options]);
 ```
 
+### Repeated date occurrences
+
+`dateOccurrences` can render the same calendar date more than once. Additional occurrences are placed in sparse
+rows directly below the date's natural week, in the same weekday column. Each occurrence needs a stable `id` so it
+can be selected and focused independently.
+
+```javascript
+new AirDatepicker('#el', {
+    selectedDates: ['2026-10-20'],
+    selectedOccurrenceId: 'second',
+    dateOccurrences(date) {
+        if (date.getFullYear() !== 2026 || date.getMonth() !== 9 || date.getDate() !== 20) return;
+
+        return [
+            {id: 'first', html: '20¹'},
+            {id: 'second', html: '20²'}
+        ];
+    },
+    onSelect({date, occurrenceId}) {
+        // occurrenceId is "first" or "second" for the repeated date.
+    }
+});
+```
+
+The `occurrenceId` is also passed to `onBeforeSelect`, `onFocus`, and `onRenderCell`. Programmatic selection accepts
+the same value: `datepicker.selectDate('2026-10-20', {occurrenceId: 'second'})`.
+
+### Opening from a button
+
+A `<button>` opens the calendar as a popup, the way an input does, but nothing can be typed into it. A click on
+the button toggles the calendar, and pressing anywhere outside both closes it. The button's text is yours to set,
+for example from `onSelect`. Pass `inline: true` to render the calendar after the button instead.
+
+```javascript
+new AirDatepicker('#date-button', {
+    onSelect({formattedDate}) {
+        document.querySelector('#date-button').textContent = formattedDate;
+    }
+});
+```
+
+### Mobile mode in a custom container
+
+With `isMobile: true`, the overlay is placed in the calendar's container, including a custom `container`, so it
+covers the page wherever that container is put (inside a fullscreen element, for example). In mobile mode the
+calendar is centred on the screen even when `position` is a function.
+
 ## Demo and docs
 * [Version 3](https://air-datepicker.com)
 
@@ -31,7 +78,7 @@ new AirDatepicker('#el' [, options]);
 * now keyboard events are not triggered when the calendar is hidden [#631](https://github.com/t1m0n/air-datepicker/issues/631)
 * fixed return type in `selectDate` function, thanks to [marfrede](https://github.com/marfrede) in [#656](https://github.com/t1m0n/air-datepicker/pull/656)
 * now you can re-enable cells in `onRenderCell` callback, thanks to [kdagnan](https://github.com/kdagnan) in [#657](https://github.com/t1m0n/air-datepicker/pull/657)
-* fixed gramma and spelling in the Russian docs, thanks to [Ser5](https://github.com/Ser5) [#669](https://github.com/t1m0n/air-datepicker/pull/669)
+* fixed gramma and spelling in the Russian docs, thanks to [Ser5](https://github.com/Ser5) in [#669](https://github.com/t1m0n/air-datepicker/pull/669)
 
 ### v3.5.3
 * fixed range mode [#613](https://github.com/t1m0n/air-datepicker/issues/613)
