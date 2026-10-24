@@ -45,6 +45,26 @@ new AirDatepicker('#el', {
 The `occurrenceId` is also passed to `onBeforeSelect`, `onFocus`, and `onRenderCell`. Programmatic selection accepts
 the same value: `datepicker.selectDate('2026-10-20', {occurrenceId: 'second'})`.
 
+### Opening from a button
+
+A `<button>` opens the calendar as a popup, the way an input does, but nothing can be typed into it. A click on
+the button toggles the calendar, and pressing anywhere outside both closes it. The button's text is yours to set,
+for example from `onSelect`. Pass `inline: true` to render the calendar after the button instead.
+
+```javascript
+new AirDatepicker('#date-button', {
+    onSelect({formattedDate}) {
+        document.querySelector('#date-button').textContent = formattedDate;
+    }
+});
+```
+
+### Mobile mode in a custom container
+
+With `isMobile: true`, the overlay is placed in the calendar's container, including a custom `container`, so it
+covers the page wherever that container is put (inside a fullscreen element, for example). In mobile mode the
+calendar is centred on the screen even when `position` is a function.
+
 ## Demo and docs
 * [Version 3](https://air-datepicker.com)
 

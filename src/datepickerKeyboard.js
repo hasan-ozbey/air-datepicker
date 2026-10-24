@@ -207,6 +207,9 @@ export default class DatepickerKeyboard {
         }
 
         if (key === 'Enter') {
+            // Handled here, so a button does not take it as a click that toggles the calendar
+            e.preventDefault();
+
             if (dp.currentView !== opts.minView) {
                 dp.down();
                 return;
