@@ -26,7 +26,6 @@ import './datepickerVars.scss';
 import './datepicker.scss';
 
 let $datepickersContainer = '',
-    $datepickerOverlay = '',
     containerBuilt = false,
     baseTemplate = '' +
         '<i class="air-datepicker--pointer"></i>' +
@@ -64,6 +63,11 @@ export default class Datepicker {
             this.elIsInput = true;
         }
 
+        // A button opens the calendar as an input does, with nothing typed into it
+        if (this.$el.nodeName === 'BUTTON') {
+            this.elIsButton = true;
+        }
+
         this.inited = false;
         this.visible = false;
 
@@ -83,7 +87,9 @@ export default class Datepicker {
         this.rangeDateFrom = '';
         this.rangeDateTo = '';
         this.timepickerIsActive = false; // Need when autoClose and timepicker are both true
-        this.treatAsInline = this.opts.inline || !this.elIsInput;
+        this.isPopup = !this.opts.inline && (this.elIsInput || this.elIsButton);
+        this.treatAsInline = !this.isPopup;
+        this.$overlay = false;
 
         this.init();
     }
@@ -95,7 +101,6 @@ export default class Datepicker {
             opts,
             treatAsInline,
             opts: {
-                inline,
                 isMobile,
                 selectedDates,
                 keyboardNav,
@@ -107,15 +112,14 @@ export default class Datepicker {
         let shouldBuildGlobalContainer =
             // Check if global container still exist in DOM
             (!containerBuilt || containerBuilt && $datepickersContainer && !$body.contains($datepickersContainer))
-            && !inline
-            && this.elIsInput
+            && this.isPopup
             && !this.$customContainer;
 
         if (shouldBuildGlobalContainer) {
             Datepicker.buildGlobalContainer(Datepicker.defaultGlobalContainerId);
         }
 
-        if (isMobile && !$datepickerOverlay && !treatAsInline) {
+        if (isMobile && !treatAsInline) {
             this._createMobileOverlay();
         }
 
@@ -124,11 +128,11 @@ export default class Datepicker {
         this._createMinMaxDates();
         this._limitViewDateByMaxMinDates();
 
-        if (this.elIsInput) {
-            if (!inline) {
-                this._bindEvents();
-            }
+        if (this.isPopup) {
+            this._bindEvents();
+        }
 
+        if (this.elIsInput || this.isPopup) {
             if (keyboardNav && !onlyTimepicker) {
                 this.keyboardNav = new DatepickerKeyboard({dp: this, opts});
             }
@@ -145,7 +149,7 @@ export default class Datepicker {
             this.show();
         }
 
-        if (isMobile && !treatAsInline) {
+        if (isMobile && this.elIsInput && !treatAsInline) {
             this.$el.setAttribute('readonly', true);
         }
 
@@ -154,9 +158,19 @@ export default class Datepicker {
         }
     }
 
+    /**
+     * One overlay in each container, shared by the datepickers shown from it,
+     * so it covers the page wherever the container is put
+     */
     _createMobileOverlay() {
-        $datepickerOverlay = createElement({className: 'air-datepicker-overlay'});
-        $datepickersContainer.appendChild($datepickerOverlay);
+        let $container = this.$container;
+
+        this.$overlay = [...$container.children].find($child => $child.classList.contains('air-datepicker-overlay'));
+
+        if (!this.$overlay) {
+            this.$overlay = createElement({className: 'air-datepicker-overlay'});
+            $container.appendChild(this.$overlay);
+        }
     }
 
     _createComponents() {
@@ -164,7 +178,6 @@ export default class Datepicker {
             opts,
             treatAsInline,
             opts: {
-                inline,
                 buttons,
                 timepicker,
                 position,
@@ -177,13 +190,11 @@ export default class Datepicker {
 
         this._buildBaseHtml();
 
-        if (this.elIsInput) {
-            if (!inline) {
-                this._setPositionClasses(position);
-            }
+        if (this.isPopup) {
+            this._setPositionClasses(position);
         }
 
-        if (inline || !this.elIsInput) {
+        if (!this.isPopup) {
             this.$datepicker.classList.add('-inline-');
         }
 
@@ -231,18 +242,21 @@ export default class Datepicker {
     }
 
     _addMobileAttributes() {
-        $datepickerOverlay.addEventListener('click', this._onClickOverlay);
+        this.$overlay?.addEventListener('click', this._onClickOverlay);
 
         this.$datepicker.classList.add('-is-mobile-');
-        this.$el.setAttribute('readonly', true);
+
+        if (this.elIsInput) {
+            this.$el.setAttribute('readonly', true);
+        }
     }
 
     _removeMobileAttributes() {
-        $datepickerOverlay.removeEventListener('click', this._onClickOverlay);
+        this.$overlay?.removeEventListener('click', this._onClickOverlay);
 
         this.$datepicker.classList.remove('-is-mobile-');
 
-        if (!this.initialReadonly && this.initialReadonly !== '') {
+        if (this.elIsInput && !this.initialReadonly && this.initialReadonly !== '') {
             this.$el.removeAttribute('readonly');
         }
     }
@@ -275,14 +289,10 @@ export default class Datepicker {
     }
 
     _buildBaseHtml() {
-        let {inline} = this.opts;
-
-        if  (this.elIsInput) {
-            if (!inline) {
-                this.$container.appendChild(this.$datepicker);
-            } else {
-                insertAfter(this.$datepicker, this.$el);
-            }
+        if (this.isPopup) {
+            this.$container.appendChild(this.$datepicker);
+        } else if (this.elIsInput || this.elIsButton) {
+            insertAfter(this.$datepicker, this.$el);
         } else {
             this.$el.appendChild(this.$datepicker);
         }
@@ -339,7 +349,12 @@ export default class Datepicker {
     }
 
     _bindEvents() {
-        this.$el.addEventListener(this.opts.showEvent, this._onFocus);
+        if (this.elIsButton) {
+            this.$el.addEventListener('click', this._onClickButton);
+            document.addEventListener('pointerdown', this._onPointerDownOutside, true);
+        } else {
+            this.$el.addEventListener(this.opts.showEvent, this._onFocus);
+        }
         this.$el.addEventListener('blur', this._onBlur);
         this.$datepicker.addEventListener('mousedown', this._onMouseDown);
         this.$datepicker.addEventListener('mouseup', this._onMouseUp);
@@ -712,7 +727,7 @@ export default class Datepicker {
         });
 
         if (isMobile) {
-            $datepickerOverlay.classList.remove('-active-');
+            this.$overlay?.classList.remove('-active-');
         }
     }
 
@@ -725,6 +740,12 @@ export default class Datepicker {
     setPosition = (position, isViewChange = false) => {
         position = position || this.opts.position;
 
+        // A calendar shown as on a phone sits in the middle of the screen, wherever it would be put otherwise
+        if (this.opts.isMobile) {
+            this.$datepicker.style.cssText = 'left: 50%; top: 50%';
+            return;
+        }
+
         if (typeof position === 'function') {
             this.customHide = position({
                 $datepicker: this.$datepicker,
@@ -735,8 +756,6 @@ export default class Datepicker {
             });
             return;
         }
-
-        let  {isMobile} = this.opts;
 
         let vpDims = this.$el.getBoundingClientRect(),
             dims = this.$el.getBoundingClientRect(),
@@ -750,11 +769,6 @@ export default class Datepicker {
             offset = this.opts.offset,
             main = pos[0],
             secondary = pos[1];
-
-        if (isMobile) {
-            this.$datepicker.style.cssText = 'left: 50%; top: 50%';
-            return;
-        }
 
         // If datepicker's container is the same with target element
         if ($dpOffset === $elOffset && $dpOffset !== document.body) {
@@ -1029,7 +1043,7 @@ export default class Datepicker {
 
         this.currentView = view;
 
-        if (this.elIsInput && this.visible) {
+        if (this.isPopup && this.visible) {
             this.setPosition(undefined, true);
         }
 
@@ -1111,6 +1125,8 @@ export default class Datepicker {
         }
 
         this.$el.removeEventListener(showEvent, this._onFocus);
+        this.$el.removeEventListener('click', this._onClickButton);
+        document.removeEventListener('pointerdown', this._onPointerDownOutside, true);
         this.$el.removeEventListener('blur', this._onBlur);
         window.removeEventListener('resize', this._onResize);
         if (isMobile) {
@@ -1197,7 +1213,7 @@ export default class Datepicker {
         }
 
         if (!prevOpts.isMobile && isMobile) {
-            if (!this.treatAsInline && !$datepickerOverlay) {
+            if (!this.treatAsInline) {
                 this._createMobileOverlay();
             }
             this._addMobileAttributes();
@@ -1208,7 +1224,7 @@ export default class Datepicker {
             this._removeMobileAttributes();
 
             if (this.visible) {
-                $datepickerOverlay.classList.remove('-active-');
+                this.$overlay?.classList.remove('-active-');
                 if (typeof this.opts.position !== 'function') {
                     this.setPosition();
                 }
@@ -1264,7 +1280,7 @@ export default class Datepicker {
     }
 
     _showMobileOverlay() {
-        $datepickerOverlay.classList.add('-active-');
+        this.$overlay?.classList.add('-active-');
     }
 
     _hasTransition() {
@@ -1370,6 +1386,24 @@ export default class Datepicker {
         if (!this.inFocus && this.visible && !this.opts.isMobile) {
             this.hide();
         }
+    }
+
+    _onClickButton = () => {
+        if (this.visible) {
+            this.hide();
+        } else {
+            this.show();
+        }
+    }
+
+    /**
+     * A button keeps no focus in some browsers, so it is not left by a blur:
+     * pressing anywhere but on it or on its calendar closes the calendar
+     */
+    _onPointerDownOutside = (e) => {
+        if (!this.visible || this.$el.contains(e.target) || this.$datepicker.contains(e.target)) return;
+
+        this.hide();
     }
 
     _onMouseDown = (e) => {

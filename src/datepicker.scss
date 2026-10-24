@@ -84,14 +84,12 @@
       display: none;
     }
 
-    &:not(.-custom-position-) {
-      transform: translate(-50%, calc(-50% + var(--adp-transition-offset)));
-    }
+    // Centred on the screen even where a custom position would put it elsewhere
+    transform: translate(-50%, calc(-50% + var(--adp-transition-offset)));
 
     &.-active- {
-      &:not(.-custom-position-) {
-        transform: translate(-50%, -50%);
-      }
+      transform: translate(-50%, -50%);
+      opacity: 1;
     }
   }
 
